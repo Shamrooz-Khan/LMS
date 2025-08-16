@@ -1,0 +1,16 @@
+<h2>Welcome, {{ request.user.username }}</h2>
+<a href="{% url 'add_course' %}">+ Add Course</a> |
+<a href="{% url 'logout' %}">Logout</a>
+
+<h3>Your Courses:</h3>
+<ul>
+    {% for course in courses %}
+        <li>
+            <strong>{{ course.title }}</strong> - {{ course.description }}
+            [<a href="{% url 'edit_course' course.id %}">Edit</a> |
+             <a href="{% url 'delete_course' course.id %}">Delete</a>]
+        </li>
+    {% empty %}
+        <li>No courses yet.</li>
+    {% endfor %}
+</ul>
