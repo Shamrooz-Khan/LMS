@@ -13,7 +13,7 @@ def register(request):
         password = request.POST['password']
         User.objects.create_user(username=username, password=password)
         return redirect('login')
-    return render(request, 'register.html')
+    return render(request, 'core/register.html')
 
 def user_login(request):
     if request.method == 'POST':
@@ -23,7 +23,7 @@ def user_login(request):
         if user:
             login(request, user)
             return redirect('dashboard')
-    return render(request, 'login.html')
+    return render(request, 'core/login.html')
 
 def user_logout(request):
     logout(request)
