@@ -4,8 +4,27 @@ from django.contrib.auth.decorators import login_required
 from .models import Course
 from django.shortcuts import render, redirect, get_object_or_404
 from .forms import CourseForm
+from .forms import ProfileForm
 
 # Create your views here.
+
+
+
+@login_required
+def view_profile(request):
+    return render(request, 'core/profile.html', {'user': request.user})
+
+@login_required
+def edit_profile(request):
+    if request.method == 'POST':
+        form = ProfileForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            return redirect('view_profile')
+    else:
+        form = ProfileForm(instance=request.user)
+    return render(request, 'core/edit_profile.html', {'form': form})
+
 
 def register(request):
     if request.method == 'POST':
