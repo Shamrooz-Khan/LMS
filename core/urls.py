@@ -1,17 +1,29 @@
-# core/urls.py
 from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('register/', views.register, name='register'),
-    path('login/', views.user_login, name='login'),
-    path('logout/', views.user_logout, name='logout'),
-    path('dashboard/', views.dashboard, name='dashboard'),
-    path('add/', views.add_course, name='add_course'),
-    path('edit/<int:course_id>/', views.edit_course, name='edit_course'),
-    path('delete/<int:course_id>/', views.delete_course, name='delete_course'),
-    path('profile/', views.view_profile, name='view_profile'),
-    path('profile/edit/', views.edit_profile, name='edit_profile'),
+    path('', views.home, name='home'),
+    path('register/', views.register_view, name='register'),
+    path('login/', views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
+    path('student/dashboard/', views.student_dashboard, name='student_dashboard'),
+    path('instructor/dashboard/', views.instructor_dashboard, name='instructor_dashboard'),
+    path('students/', views.student_list, name='student_list'),
+    path('students/edit/<int:pk>/', views.edit_student, name='edit_student'),
+    path('students/delete/<int:pk>/', views.delete_student, name='delete_student'),
+    path('students/create/', views.create_student, name='create_student'),
+    path('courses/instructor/', views.instructor_courses, name='instructor_courses'),
+    path('courses/available/', views.available_courses, name='available_courses'),
+    path('courses/enroll/<int:course_id>/', views.enroll_course, name='enroll_course'),
+    path('courses/my/', views.my_courses, name='my_courses'),
+    path('attendance/', views.attendance_home, name='attendance_home'),  
+    path('attendance/<int:course_id>/', views.mark_attendance, name='mark_attendance'),
+    path('attendance/view/', views.view_attendance, name='view_attendance'),
+    path('feedback/submit/<int:course_id>/', views.submit_feedback, name='submit_feedback'),
+    path('feedback/view/', views.view_feedback, name='view_feedback'),
+    path('notifications/', views.notifications, name='notifications'),
+
+
 
 
 ]

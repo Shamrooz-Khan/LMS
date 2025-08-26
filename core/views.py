@@ -1,83 +1,272 @@
-from django.contrib.auth.models import User
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
-from .models import Course
 from django.shortcuts import render, redirect, get_object_or_404
-from .forms import CourseForm
-from .forms import ProfileForm
+from django.contrib.auth import authenticate, login
+from .forms import CustomUserCreationForm
+from .models import CustomUser
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import logout
+from .models import Course
+from .models import Attendance
+from datetime import date
+from .models import Feedback
+from .models import Notification  
 
-# Create your views here.
-
-
+def home(request):
+    return render(request, 'core/home.html')
 
 @login_required
-def view_profile(request):
-    return render(request, 'core/profile.html', {'user': request.user})
+def student_dashboard(request):
+    return render(request, 'core/student_dashboard.html')
 
 @login_required
-def edit_profile(request):
+def instructor_dashboard(request):
+    return render(request, 'core/instructor_dashboard.html')
+    
+
+def register_view(request):
     if request.method == 'POST':
-        form = ProfileForm(request.POST, instance=request.user)
+        form = CustomUserCreationForm(request.POST)
         if form.is_valid():
             form.save()
-            return redirect('view_profile')
+            messages.success(request, "Account created successfully. Please log in.")
+            return redirect('login')
+        else:
+            messages.error(request, "Registration failed. Please correct the errors below.")
     else:
-        form = ProfileForm(instance=request.user)
-    return render(request, 'core/edit_profile.html', {'form': form})
+        form = CustomUserCreationForm()
+    return render(request, 'core/register.html', {'form': form})
 
-
-def register(request):
+def login_view(request):
     if request.method == 'POST':
-        username = request.POST['username']
+        username = request.POST['username'].strip()
         password = request.POST['password']
-        User.objects.create_user(username=username, password=password)
-        return redirect('login')
-    return render(request, 'core/register.html')
+        
+        user = authenticate(request, username=username, password=password)
 
-def user_login(request):
-    if request.method == 'POST':
-        username = request.POST['username']
-        password = request.POST['password']
-        user = authenticate(username=username, password=password)
         if user:
             login(request, user)
-            return redirect('dashboard')
+            messages.success(request, f"Welcome back, {user.username}!")
+            
+            if user.role == 'student':
+                return redirect('student_dashboard')
+            elif user.role == 'instructor':
+                return redirect('instructor_dashboard')
+            else:
+                return redirect('home')  # fallback
+        else:
+            messages.error(request, "Invalid username or password.")
+            return render(request, 'core/login.html')
     return render(request, 'core/login.html')
 
-def user_logout(request):
+# List all students
+@login_required
+def student_list(request):
+    if request.user.role != 'instructor':
+        return redirect('home')
+    
+    query = request.GET.get('q', '')
+    students = CustomUser.objects.filter(role='student')
+    if query:
+        students = students.filter(username__icontains=query) | students.filter(email__icontains=query)
+
+    return render(request, 'core/student_list.html', {'students': students, 'query': query})
+
+@login_required
+def create_student(request):
+    if request.user.role != 'instructor':
+        return redirect('home')
+    form = CustomUserCreationForm(request.POST or None)
+    if form.is_valid():
+        user = form.save(commit=False)
+        user.role = 'student'  # force role to student
+        user.set_password(form.cleaned_data['password1'])
+        user.save()
+        return redirect('student_list')
+    return render(request, 'core/create_student.html', {'form': form})
+
+# Edit student
+@login_required
+def edit_student(request, pk):
+    if request.user.role != 'instructor':
+        return redirect('home')
+    student = get_object_or_404(CustomUser, pk=pk, role='student')
+    form = CustomUserCreationForm(request.POST or None, instance=student)
+    if form.is_valid():
+        form.save()
+        return redirect('student_list')
+    return render(request, 'core/edit_student.html', {'form': form, 'student': student})
+
+# Delete student
+@login_required
+def delete_student(request, pk):
+    if request.user.role != 'instructor':
+        return redirect('home')
+    student = get_object_or_404(CustomUser, pk=pk, role='student')
+    if request.method == 'POST':
+        student.delete()
+        return redirect('student_list')
+    return render(request, 'core/delete_student.html', {'student': student})
+
+# Instructor View: All Courses
+@login_required
+def instructor_courses(request):
+    if request.user.role != 'instructor':
+        return redirect('home')
+    courses = Course.objects.filter(instructor=request.user)
+    return render(request, 'core/instructor_courses.html', {'courses': courses})
+
+# Student View: Available Courses
+@login_required
+def available_courses(request):
+    if request.user.role != 'student':
+        return redirect('home')
+    enrolled = request.user.enrolled_courses.all()
+    available = Course.objects.exclude(id__in=enrolled.values_list('id', flat=True))
+    return render(request, 'core/available_courses.html', {'courses': available})
+
+# Enroll in course
+@login_required
+def enroll_course(request, course_id):
+    if request.user.role != 'student':
+        return redirect('home')
+    course = get_object_or_404(Course, id=course_id)
+    course.students.add(request.user)
+    # After course.students.add(request.user)
+    Notification.objects.create(
+    user=course.instructor,
+    message=f"{request.user.username} enrolled in {course.title}"
+)
+    return redirect('my_courses')
+
+# View my enrolled courses
+@login_required
+def my_courses(request):
+    if request.user.role != 'student':
+        return redirect('home')
+    courses = request.user.enrolled_courses.all()
+    return render(request, 'core/my_courses.html', {'courses': courses})
+
+# Instructor: Mark Attendance
+@login_required
+def mark_attendance(request, course_id):
+    if request.user.role != 'instructor':
+        return redirect('home')
+
+    course = get_object_or_404(Course, id=course_id, instructor=request.user)
+    students = course.students.all()
+
+    if request.method == 'POST':
+        for student in students:
+            status = request.POST.get(f'status_{student.id}', 'Absent')
+            
+            Attendance.objects.update_or_create(
+                student=student,
+                course=course,
+                date=date.today(),
+                defaults={'status': status}
+            )
+
+            Notification.objects.create(
+                user=student,
+                message=f"Attendance marked for {course.title} on {date.today()}"
+            )
+
+        return redirect('instructor_courses')
+
+    return render(request, 'core/mark_attendance.html', {
+        'course': course,
+        'students': students,
+        'today': date.today()
+    })
+
+# Student: View Attendance
+from django.utils.dateparse import parse_date
+from django.db.models import Count
+
+@login_required
+def view_attendance(request):
+    if request.user.role != 'student':
+        return redirect('home')
+
+    # Get filters
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
+    records = Attendance.objects.filter(student=request.user).order_by('-date')
+
+    # Apply date filters
+    if start_date:
+        records = records.filter(date__gte=parse_date(start_date))
+    if end_date:
+        records = records.filter(date__lte=parse_date(end_date))
+
+    # Attendance percentage
+    total = records.count()
+    present_count = records.filter(status='Present').count()
+    percentage = round((present_count / total) * 100, 1) if total > 0 else 0
+
+    context = {
+        'records': records,
+        'start_date': start_date,
+        'end_date': end_date,
+        'percentage': percentage,
+        'present_count': present_count,
+        'total': total
+    }
+    return render(request, 'core/view_attendance.html', context)
+
+@login_required
+def attendance_home(request):
+    if request.user.role != 'instructor':
+        return redirect('home')
+
+    courses = Course.objects.filter(instructor=request.user)
+    return render(request, 'core/attendance_home.html', {'courses': courses})
+
+# Student: Submit feedback
+@login_required
+def submit_feedback(request, course_id):
+    if request.user.role != 'student':
+        return redirect('home')
+    
+    course = get_object_or_404(Course, id=course_id)
+
+    if request.method == 'POST':
+        content = request.POST.get('content')
+        
+        Feedback.objects.update_or_create(
+            student=request.user,
+            course=course,
+            defaults={'content': content}
+        )
+
+        Notification.objects.create(
+            user=course.instructor,
+            message=f"{request.user.username} submitted feedback on {course.title}"
+        )
+
+        return redirect('my_courses')
+    
+    return render(request, 'core/submit_feedback.html', {'course': course})
+
+
+# Instructor: View all feedback on their courses
+@login_required
+def view_feedback(request):
+    if request.user.role != 'instructor':
+        return redirect('home')
+    
+    feedbacks = Feedback.objects.filter(course__instructor=request.user).order_by('-date')
+    return render(request, 'core/view_feedback.html', {'feedbacks': feedbacks})
+
+@login_required
+def notifications(request):
+    all_notifications = Notification.objects.filter(user=request.user).order_by('-created_at')
+    return render(request, 'core/notifications.html', {'notifications': all_notifications})
+
+@login_required
+def logout_view(request):
     logout(request)
     return redirect('login')
 
-@login_required
-def dashboard(request):
-    courses = Course.objects.filter(instructor=request.user)
-    return render(request, 'core/dashboard.html', {'courses': courses})
-
-@login_required
-def add_course(request):
-    if request.method == 'POST':
-        form = CourseForm(request.POST)
-        if form.is_valid():
-            course = form.save(commit=False)
-            course.instructor = request.user
-            course.save()
-            return redirect('dashboard')
-    else:
-        form = CourseForm()
-    return render(request, 'core/add_course.html', {'form': form})
-
-@login_required
-def edit_course(request, course_id):
-    course = get_object_or_404(Course, pk=course_id, instructor=request.user)
-    form = CourseForm(request.POST or None, instance=course)
-    if form.is_valid():
-        form.save()
-        return redirect('dashboard')
-    return render(request, 'core/edit_course.html', {'form': form})
-
-@login_required
-def delete_course(request, course_id):
-    course = get_object_or_404(Course, pk=course_id, instructor=request.user)
-    course.delete()
-    return redirect('dashboard')
 

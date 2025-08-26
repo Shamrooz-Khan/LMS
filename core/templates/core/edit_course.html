@@ -1,9 +1,0 @@
-<h2>Edit Course</h2>
-
-<form method="POST">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Update</button>
-</form>
-
-<a href="{% url 'dashboard' %}">Back to Dashboard</a>
