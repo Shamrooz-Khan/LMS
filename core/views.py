@@ -146,6 +146,15 @@ def my_courses(request):
     courses = request.user.enrolled_courses.all()
     return render(request, 'core/my_courses.html', {'courses': courses})
 
+@login_required
+def unenroll_course(request, course_id):
+    if request.user.role != 'student':
+        return redirect('home')
+    course = get_object_or_404(Course, id=course_id)
+    course.students.remove(request.user)
+    return redirect('my_courses')
+
+
 # Instructor: Mark Attendance
 @login_required
 def mark_attendance(request, course_id):
@@ -263,6 +272,40 @@ def view_feedback(request):
 def notifications(request):
     all_notifications = Notification.objects.filter(user=request.user).order_by('-created_at')
     return render(request, 'core/notifications.html', {'notifications': all_notifications})
+
+@login_required
+def simulate_devops(request):
+    devoops_errors = {
+        "bad_yaml": {
+            "title": "Invalid GitHub Actions YAML",
+            "error": "Unrecognized key 'runs-on'",
+            "fix": "Make sure 'runs-on' is under correct indentation under 'jobs:'."
+        },
+        "missing_req": {
+            "title": "Missing requirements.txt",
+            "error": "ModuleNotFoundError: No module named 'django'",
+            "fix": "Add 'django' to your requirements.txt and commit the file."
+        },
+        "test_fail": {
+            "title": "Failing Unit Tests",
+            "error": "AssertionError: Expected status code 200, got 500",
+            "fix": "Check your view logic and ensure templates exist."
+        },
+        "docker_error": {
+            "title": "Dockerfile Build Error",
+            "error": "COPY failed: file not found in context",
+            "fix": "Make sure all paths in Dockerfile are correct and files exist."
+        }
+    }
+
+    selected = request.GET.get('error')
+    detail = devoops_errors.get(selected)
+
+    return render(request, 'core/simulate_devops.html', {
+        'errors': devoops_errors,
+        'detail': detail,
+        'selected': selected
+    })
 
 @login_required
 def logout_view(request):

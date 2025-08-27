@@ -15,6 +15,7 @@ urlpatterns = [
     path('courses/instructor/', views.instructor_courses, name='instructor_courses'),
     path('courses/available/', views.available_courses, name='available_courses'),
     path('courses/enroll/<int:course_id>/', views.enroll_course, name='enroll_course'),
+    path('courses/unenroll/<int:course_id>/', views.unenroll_course, name='unenroll_course'),
     path('courses/my/', views.my_courses, name='my_courses'),
     path('attendance/', views.attendance_home, name='attendance_home'),  
     path('attendance/<int:course_id>/', views.mark_attendance, name='mark_attendance'),
@@ -22,6 +23,7 @@ urlpatterns = [
     path('feedback/submit/<int:course_id>/', views.submit_feedback, name='submit_feedback'),
     path('feedback/view/', views.view_feedback, name='view_feedback'),
     path('notifications/', views.notifications, name='notifications'),
+    path('simulate/devops/', views.simulate_devops, name='simulate_devops'),
 
 
 
